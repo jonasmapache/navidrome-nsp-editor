@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NSP Editor – Smart Playlists for Navidrome</title>
+<meta name="description" content="Build Navidrome smart playlist (.nsp) files with a visual rule editor. Runs entirely in your browser.">
+<style>
+@font-face{font-family:"Bricolage Grotesque";src:url(fonts/bricolage-grotesque.woff2) format("woff2");font-weight:200 800;font-display:swap}
+@font-face{font-family:"Figtree";src:url(fonts/figtree.woff2) format("woff2");font-weight:300 900;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url(fonts/jetbrains-mono.woff2) format("woff2");font-weight:100 800;font-display:swap}
+
+:root{
+  color-scheme: light;
+  --bg:#F1EEF7; --surface:#FFFFFF; --sunk:#F7F5FB;
+  --ink:#231B35; --muted:#6B6280; --line:#DDD6EA;
+  --and:#6A4BE0; --and-soft:#ECE7FD;
+  --or:#0B8F82;  --or-soft:#DFF4F1;
+  --warn:#A65A00; --warn-soft:#FDF0DC; --danger:#C0392B;
+  --code-bg:#231B35; --code-ink:#E9E4F5;
+  --k:#B9A8FF; --s:#7FE0D1; --n:#FFC97A; --b:#FF9DB8;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Figtree", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --bg:#16121E; --surface:#201A2B; --sunk:#1A1523;
+    --ink:#EEE9F7; --muted:#A69CBB; --line:#352C46;
+    --and:#A28DFF; --and-soft:#2C2447;
+    --or:#3CC8B6;  --or-soft:#173431;
+    --warn:#F2B35B; --warn-soft:#3A2A14; --danger:#FF7B6B;
+    --code-bg:#110E17; --code-ink:#E9E4F5;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--and);outline-offset:2px}
+a{color:var(--and)}
+
+/* ---------- Header ---------- */
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px clamp(16px,4vw,40px);border-bottom:1px solid var(--line);background:var(--surface)}
+.brand{font-family:var(--display);font-weight:800;font-size:1.05rem;margin-right:auto;display:flex;align-items:center;gap:10px}
+.brand svg{flex:none}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 16px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--and)}
+.btn.primary{background:var(--and);border-color:var(--and);color:#fff;font-weight:700}
+.btn.primary:hover{filter:brightness(1.08)}
+select.btn{padding-right:30px}
+.lang{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px}
+.lang button{border:0;background:transparent;border-radius:999px;padding:4px 10px;cursor:pointer;color:var(--muted);font-weight:700;font-size:.85rem}
+.lang button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+
+/* ---------- Layout ---------- */
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,440px);gap:32px;padding:28px clamp(16px,4vw,40px) 40px;max-width:1500px;margin:0 auto}
+@media (max-width:980px){main{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- Title ---------- */
+.title-in{width:100%;border:0;background:transparent;font-family:var(--display);font-weight:800;font-size:clamp(2rem,4.5vw,3.4rem);line-height:1.05;letter-spacing:-.02em;padding:4px 0;border-bottom:2px dashed transparent}
+.title-in:hover,.title-in:focus{border-bottom-color:var(--line);outline:none}
+.title-in::placeholder{color:var(--muted);opacity:.6}
+.comment-in{width:100%;border:0;background:transparent;color:var(--muted);font-size:1.1rem;padding:4px 0;margin-top:2px;border-bottom:1px dashed transparent}
+.comment-in:hover,.comment-in:focus{border-bottom-color:var(--line);outline:none}
+h2{font-family:var(--display);font-weight:600;font-size:1.3rem;margin:36px 0 12px}
+.hint{color:var(--muted);font-size:.9rem;margin:-6px 0 14px}
+
+/* ---------- Groups ---------- */
+.group{--c:var(--and);--c-soft:var(--and-soft);position:relative;border-left:4px solid var(--c);background:var(--surface);border-radius:4px 14px 14px 4px;padding:14px 16px 14px 18px;box-shadow:0 1px 0 var(--line)}
+.group[data-conj="any"]{--c:var(--or);--c-soft:var(--or-soft)}
+.group .group{background:var(--sunk);box-shadow:none;margin:2px 0}
+.ghead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--bg)}
+.seg button{border:0;background:transparent;border-radius:999px;padding:5px 14px;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--c);color:#fff;font-weight:700}
+.glabel{color:var(--muted);font-size:.92rem}
+.xbtn{margin-left:auto;border:0;background:transparent;color:var(--muted);cursor:pointer;width:32px;height:32px;border-radius:50%;font-size:1.2rem;line-height:1;flex:none}
+.xbtn:hover{background:var(--bg);color:var(--danger)}
+.join{font-family:var(--display);font-weight:600;font-size:.85rem;color:var(--c);padding:4px 0 4px 2px}
+.gfoot{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.add{--c:var(--and);--c-soft:var(--and-soft);border:1px dashed var(--c);background:transparent;color:var(--c);border-radius:999px;padding:5px 14px;cursor:pointer;font-weight:700;font-size:.92rem}
+.group .add{--c:inherit;--c-soft:inherit}
+.group[data-conj="all"] > .gfoot .add{--c:var(--and);--c-soft:var(--and-soft)}
+.group[data-conj="any"] > .gfoot .add{--c:var(--or);--c-soft:var(--or-soft)}
+.add:hover{background:var(--c-soft)}
+.empty{color:var(--muted);font-style:italic;padding:6px 0}
+
+/* ---------- Rules ---------- */
+.rule{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 6px 8px 10px;border-radius:10px;background:var(--c-soft)}
+.rule select,.rule input,.opt select,.opt input,dialog input{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 10px;min-height:36px}
+.rule select:focus,.rule input:focus,.opt select:focus,.opt input:focus,dialog input:focus{border-color:var(--c,var(--and));outline:none}
+.rule .f{min-width:210px;flex:1 1 210px;max-width:280px}
+.rule .o{min-width:150px}
+.rule .v{flex:1 1 150px;min-width:120px}
+.rule .v.short{flex:0 1 110px;min-width:90px}
+.rule .unit{color:var(--muted);font-size:.9rem}
+.rule .note{flex:1 1 100%;color:var(--muted);font-size:.85rem;padding-left:2px}
+.rule .note button{border:0;background:none;color:var(--c);text-decoration:underline;cursor:pointer;padding:0}
+.rule.invalid{box-shadow:inset 0 0 0 2px var(--warn)}
+.rule textarea{flex:1 1 100%;min-height:60px;font:13px/1.4 var(--mono);border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface)}
+.rawnote{flex:1 1 100%;font-size:.85rem;color:var(--warn)}
+
+/* ---------- Options ---------- */
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.opt{background:var(--surface);border-radius:14px;padding:16px;box-shadow:0 1px 0 var(--line)}
+.opt h3{font-family:var(--display);font-weight:600;font-size:1.02rem;margin:0 0 10px}
+.opt .row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.opt .row select{flex:1 1 150px}
+.dir{border:1px solid var(--line);background:var(--surface);border-radius:8px;min-height:36px;padding:0 10px;cursor:pointer;white-space:nowrap}
+.radio{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.radio label,.check{display:flex;align-items:center;gap:6px;cursor:pointer}
+.opt input[type=number]{width:110px}
+
+/* ---------- Preview ---------- */
+aside{position:sticky;top:20px;align-self:start}
+@media (max-width:980px){aside{position:static}}
+.preview{background:var(--code-bg);color:var(--code-ink);border-radius:16px;overflow:hidden}
+.phead{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.fname{font:13px var(--mono);opacity:.75;margin-right:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.preview .btn{background:transparent;color:var(--code-ink);border-color:rgba(255,255,255,.2);padding:6px 14px;font-size:.9rem}
+.preview .btn.primary{background:var(--and);border-color:var(--and);color:#fff}
+pre{margin:0;padding:16px 18px;font:13px/1.6 var(--mono);overflow:auto;max-height:calc(100vh - 240px);tab-size:2}
+@media (max-width:980px){pre{max-height:none}}
+.jk{color:var(--k)}.js{color:var(--s)}.jn{color:var(--n)}.jb{color:var(--b)}
+.warns{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+.warns li{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:8px 12px;font-size:.92rem}
+.ok{margin-top:14px;color:var(--muted);font-size:.92rem}
+
+/* ---------- Library dialog ---------- */
+dialog{border:0;border-radius:18px;padding:0;background:var(--surface);color:var(--ink);width:min(520px,92vw);box-shadow:0 30px 80px rgba(20,10,40,.35)}
+dialog::backdrop{background:rgba(20,12,35,.45)}
+.dlg{padding:22px 22px 18px}
+.dlg h2{margin:0 0 6px}
+.dlg p{color:var(--muted);font-size:.92rem;margin:0 0 16px}
+.librow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.librow .ln{flex:1 1 auto;min-width:0}
+.librow .li{width:90px}
+.dlgfoot{display:flex;gap:8px;justify-content:space-between;margin-top:14px;flex-wrap:wrap}
+
+/* ---------- Footer ---------- */
+footer{color:var(--muted);font-size:.85rem;text-align:center;padding:0 16px 40px}
+
+/* ---------- Toast & drop ---------- */
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;transition:.25s;pointer-events:none;z-index:20;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.drop{position:fixed;inset:0;background:color-mix(in srgb,var(--and) 18%,transparent);border:3px dashed var(--and);display:none;align-items:center;justify-content:center;font-family:var(--display);font-size:1.6rem;font-weight:800;color:var(--and);z-index:30}
+.drop.on{display:flex}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+@media (max-width:560px){.rule .f,.rule .o{min-width:0;flex:1 1 100%;max-width:none}.group{padding:12px 10px 12px 12px}.opts{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="14" cy="14" r="4.5" fill="var(--and)"/><path d="M14 1.5a12.5 12.5 0 0 1 12.5 12.5" fill="none" stroke="var(--or)" stroke-width="2.5"/></svg>
+    NSP Editor
+  </div>
+  <select class="btn" id="tplSel"></select>
+  <button class="btn" id="libBtn" data-t="libraries"></button>
+  <button class="btn" id="loadBtn" data-t="open"></button>
+  <button class="btn" id="newBtn" data-t="new"></button>
+  <div class="lang" role="group" aria-label="Language">
+    <button data-lang="de">DE</button><button data-lang="en">EN</button>
+  </div>
+  <input type="file" id="fileIn" accept=".nsp,.json,application/json" hidden>
+</header>
+
+<main>
+  <section>
+    <input class="title-in" id="name" data-tp="namePh">
+    <input class="comment-in" id="comment" data-tp="commentPh">
+
+    <h2 data-t="rules"></h2>
+    <p class="hint" data-t="rulesHint"></p>
+    <div id="rules"></div>
+
+    <h2 data-t="options"></h2>
+    <div class="opts">
+      <div class="opt">
+        <h3 data-t="sorting"></h3>
+        <div id="sortRows"></div>
+        <button class="add" id="addSort" data-t="addSort"></button>
+      </div>
+      <div class="opt">
+        <h3 data-t="limitTitle"></h3>
+        <div class="radio">
+          <label><input type="radio" name="lm" value="none"> <span data-t="limAll"></span></label>
+          <label><input type="radio" name="lm" value="count"> <span data-t="limMax"></span></label>
+          <label><input type="radio" name="lm" value="percent"> <span data-t="limPct"></span></label>
+        </div>
+        <div class="row" id="limitRow"><input type="number" id="limitVal" min="1"><span id="limitUnit" class="unit"></span></div>
+      </div>
+      <div class="opt">
+        <h3 data-t="refreshTitle"></h3>
+        <div class="row"><select id="refreshSel"></select></div>
+        <div class="row" id="refreshCustomRow" hidden><input id="refreshCustom" data-tp="refreshPh"></div>
+        <label class="check"><input type="checkbox" id="public"> <span data-t="public"></span></label>
+      </div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="preview">
+      <div class="phead">
+        <span class="fname" id="fname">smart-playlist.nsp</span>
+        <button class="btn" id="copyBtn" data-t="copy"></button>
+        <button class="btn primary" id="dlBtn" data-t="download"></button>
+      </div>
+      <pre id="out"></pre>
+    </div>
+    <ul class="warns" id="warns"></ul>
+    <p class="ok" id="okMsg" data-t="okMsg" hidden></p>
+  </aside>
+</main>
+
+<footer>
+  <span data-t="footer"></span>
+  <a href="https://www.navidrome.org/docs/usage/features/smart-playlists/" target="_blank" rel="noopener" data-t="docsLink"></a>
+</footer>
+
+<dialog id="libDlg">
+  <div class="dlg">
+    <h2 data-t="libraries"></h2>
+    <p data-t="libIntro"></p>
+    <div id="libRows"></div>
+    <div class="dlgfoot">
+      <button class="add" id="libAdd" data-t="libAdd"></button>
+      <button class="btn primary" id="libClose" data-t="done"></button>
+    </div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+<div class="drop" id="drop" data-t="dropHere"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   Texts
+============================================================ */
+const T = {
+  de: {
+    libraries:"Bibliotheken", open:"Datei öffnen", new:"Neu", tplPick:"Vorlage wählen …",
+    namePh:"Name der Playlist", commentPh:"Beschreibung (optional)",
+    rules:"Regeln", rulesHint:"Gruppen in Violett verlangen, dass alle Regeln passen. Gruppen in Grün lassen eine passende Regel genügen.",
+    options:"Optionen", sorting:"Sortierung", addSort:"+ Sortierfeld", noSort:"Keine Sortierung festgelegt.",
+    limitTitle:"Anzahl Songs", limAll:"alle", limMax:"höchstens", limPct:"Prozent", unitSongs:"Songs", unitPct:"% der passenden Songs",
+    refreshTitle:"Aktualisierung", refDefault:"bei jedem Aufruf (Standard)", ref1h:"höchstens stündlich", ref12h:"höchstens alle 12 Stunden",
+    ref1d:"einmal am Tag", ref1w:"einmal pro Woche", refCustom:"eigener Wert …", refreshPh:"z. B. 3d oder 1d12h",
+    public:"für alle Benutzer sichtbar", copy:"Kopieren", download:"Herunterladen",
+    okMsg:"Alles vollständig. Lege die Datei in einen Ordner deiner Musikbibliothek (oder in den PlaylistsPath) und starte in Navidrome einen Scan.",
+    footer:"Inoffizielles Community-Tool, nicht Teil des Navidrome-Projekts. Läuft komplett im Browser.", docsLink:"Navidrome-Doku zu Smart Playlists",
+    libIntro:"Trage deine Navidrome-Bibliotheken mit Namen ein, um sie in Regeln per Name auszuwählen. Die ID findest du in Navidrome unter Einstellungen → Bibliotheken: Sie steht beim Öffnen einer Bibliothek am Ende der Adresszeile (…/library/2). Die Liste wird nur in diesem Browser gespeichert.",
+    libAdd:"+ Bibliothek", done:"Fertig", libName:"Name", libId:"ID", libNone:"Noch keine Bibliotheken eingetragen.",
+    dropHere:".nsp-Datei hier ablegen",
+    all:"alle", any:"mindestens eine", allLbl:"Regeln müssen zutreffen", anyLbl:"Regel muss zutreffen",
+    and:"und", or:"oder", addRule:"+ Regel", addGroup:"+ Gruppe", removeGroup:"Gruppe entfernen", removeRule:"Regel entfernen",
+    emptyGroup:"Leere Gruppe – füge eine Regel hinzu.", emptyRoot:"Noch keine Regeln. Ohne Regeln landen alle Songs in der Playlist.",
+    field:"Feld", condition:"Bedingung", value:"Wert", text:"Text", tagName:"Tag-Name", days:"Tagen", to:"bis", from:"von",
+    yes:"ja", no:"nein", byId:"ID", byPath:"Pfad", plPh:"Playlist-ID aus der Adresszeile oder Pfad zur .nsp",
+    otherId:"andere ID …", libIdPh:"ID", libNote:"Bibliotheken mit Namen kannst du über", libNoteBtn:"Bibliotheken",
+    libNoteEnd:"anlegen. Die ID steht in Navidrome in der Adresszeile der Bibliothek.",
+    unknownRule:"Diese Regel kennt der Editor nicht. Sie wird unverändert übernommen und kann hier als JSON bearbeitet werden.",
+    asc:"aufsteigend ↑", desc:"absteigend ↓", random:"Zufall",
+    confirmNew:"Aktuelle Playlist verwerfen und neu beginnen?", confirmTpl:"Aktuelle Playlist durch die Vorlage ersetzen?",
+    loaded:"„{x}“ geladen.", loadErr:"„{x}“ konnte nicht gelesen werden: {e}", noObject:"Die Datei enthält kein JSON-Objekt.",
+    tplLoaded:"Vorlage „{x}“ geladen.", downloaded:"{x} heruntergeladen.", copied:"JSON kopiert.",
+    bothTop:"Hinweis: „all“ und „any“ standen gleichzeitig oben – „any“ wurde als Untergruppe übernommen.",
+    wEmptyGroup:"Eine leere Gruppe wird beim Export weggelassen.", wRaw:"Eine unbekannte Regel enthält ungültiges JSON.",
+    wTag:"Bei einer Regel mit eigenem Tag fehlt der Tag-Name.", wPl:"Bei einem Playlist-Verweis fehlt die ID bzw. der Pfad.",
+    wRange:"„{x}“: Bitte beide Grenzen eintragen.", wRangeOrder:"„{x}“: Die untere Grenze ist größer als die obere.",
+    wNum:"„{x}“: Bitte eine Zahl eintragen.", wDays:"„{x}“: Bitte eine Anzahl Tage eintragen.",
+    wDates:"„{x}“: Bitte beide Daten eintragen.", wDateOrder:"„{x}“: Das Startdatum liegt nach dem Enddatum.",
+    wDate:"„{x}“: Bitte ein Datum auswählen.", wText:"„{x}“: Bitte einen Text eintragen.", wLib:"Bei einer Bibliotheks-Regel fehlt die ID.",
+    wName:"Ohne Namen verwendet Navidrome den Dateinamen als Playlist-Namen.",
+    wNoRules:"Es gibt noch keine Regeln – die Playlist würde die ganze Bibliothek enthalten.",
+    wLimit:"Bitte eine Höchstzahl an Songs eintragen.", wPct:"Der Prozentwert muss zwischen 1 und 100 liegen.",
+    wRefresh:"Das Aktualisierungsintervall hat kein gültiges Format (z. B. 12h, 1d, 1w, 1d12h).",
+    customTag:"Eigenes Tag",
+  },
+  en: {
+    libraries:"Libraries", open:"Open file", new:"New", tplPick:"Choose a template …",
+    namePh:"Playlist name", commentPh:"Description (optional)",
+    rules:"Rules", rulesHint:"Purple groups require every rule to match. Green groups are satisfied by any one matching rule.",
+    options:"Options", sorting:"Sorting", addSort:"+ Sort field", noSort:"No sorting set.",
+    limitTitle:"Number of songs", limAll:"all", limMax:"at most", limPct:"percent", unitSongs:"songs", unitPct:"% of matching songs",
+    refreshTitle:"Refresh", refDefault:"on every access (default)", ref1h:"at most hourly", ref12h:"at most every 12 hours",
+    ref1d:"once a day", ref1w:"once a week", refCustom:"custom value …", refreshPh:"e.g. 3d or 1d12h",
+    public:"visible to all users", copy:"Copy", download:"Download",
+    okMsg:"All set. Put the file in a folder of your music library (or in your PlaylistsPath) and run a scan in Navidrome.",
+    footer:"Unofficial community tool, not part of the Navidrome project. Runs entirely in your browser.", docsLink:"Navidrome docs on smart playlists",
+    libIntro:"Add your Navidrome libraries by name to pick them in rules. To find an ID, open Settings → Libraries in Navidrome and open a library: the ID is at the end of the address bar (…/library/2). The list is stored in this browser only.",
+    libAdd:"+ Library", done:"Done", libName:"Name", libId:"ID", libNone:"No libraries added yet.",
+    dropHere:"Drop a .nsp file here",
+    all:"all", any:"any", allLbl:"rules must match", anyLbl:"rule must match",
+    and:"and", or:"or", addRule:"+ Rule", addGroup:"+ Group", removeGroup:"Remove group", removeRule:"Remove rule",
+    emptyGroup:"Empty group – add a rule.", emptyRoot:"No rules yet. Without rules, every song ends up in the playlist.",
+    field:"Field", condition:"Condition", value:"Value", text:"Text", tagName:"Tag name", days:"days", to:"to", from:"from",
+    yes:"yes", no:"no", byId:"ID", byPath:"Path", plPh:"Playlist ID from the address bar, or path to a .nsp",
+    otherId:"other ID …", libIdPh:"ID", libNote:"You can add named libraries under", libNoteBtn:"Libraries",
+    libNoteEnd:". The ID is shown in Navidrome's address bar when you open the library.",
+    unknownRule:"The editor doesn't know this rule. It is kept as is and can be edited here as JSON.",
+    asc:"ascending ↑", desc:"descending ↓", random:"Random",
+    confirmNew:"Discard the current playlist and start over?", confirmTpl:"Replace the current playlist with this template?",
+    loaded:"Loaded “{x}”.", loadErr:"Could not read “{x}”: {e}", noObject:"The file does not contain a JSON object.",
+    tplLoaded:"Loaded template “{x}”.", downloaded:"Downloaded {x}.", copied:"JSON copied.",
+    bothTop:"Note: “all” and “any” were both at the top level – “any” was added as a nested group.",
+    wEmptyGroup:"An empty group is left out of the export.", wRaw:"An unknown rule contains invalid JSON.",
+    wTag:"A custom tag rule is missing the tag name.", wPl:"A playlist reference is missing the ID or path.",
+    wRange:"“{x}”: Enter both bounds.", wRangeOrder:"“{x}”: The lower bound is greater than the upper bound.",
+    wNum:"“{x}”: Enter a number.", wDays:"“{x}”: Enter a number of days.",
+    wDates:"“{x}”: Enter both dates.", wDateOrder:"“{x}”: The start date is after the end date.",
+    wDate:"“{x}”: Pick a date.", wText:"“{x}”: Enter some text.", wLib:"A library rule is missing the ID.",
+    wName:"Without a name, Navidrome uses the file name as the playlist name.",
+    wNoRules:"There are no rules yet – the playlist would contain your whole library.",
+    wLimit:"Enter a maximum number of songs.", wPct:"The percentage must be between 1 and 100.",
+    wRefresh:"The refresh interval isn't in a valid format (e.g. 12h, 1d, 1w, 1d12h).",
+    customTag:"Custom tag",
+  }
+};
+let lang = "en";
+const t = (k, vars={}) => (T[lang][k] ?? T.en[k] ?? k).replace(/\{(\w+)\}/g, (_, v) => vars[v] ?? "");
+const L = (de, en) => lang === "de" ? de : en;
+
+/* ============================================================
+   Storage (safe if unavailable)
+============================================================ */
+const store = {
+  get(k, d){ try { const v = localStorage.getItem("nspEditor." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem("nspEditor." + k, JSON.stringify(v)); } catch {} },
+};
+let libraries = store.get("libraries", []);
+
+/* ============================================================
+   Fields (from the Navidrome docs)
+   types: text, num, date, bool, lib, playlist, custom
+   last flag: isMissing / isPresent allowed
+============================================================ */
+const FIELD_GROUPS = [
+  [["Meine Hördaten","My listening data"], [
+    ["playcount","Wiedergaben","Play count","num"],
+    ["lastplayed","Zuletzt gespielt","Last played","date"],
+    ["loved","Mit Herz","Loved","bool"],
+    ["dateloved","Herz vergeben am","Date loved","date"],
+    ["rating","Bewertung (0–5)","Rating (0–5)","num"],
+    ["daterated","Bewertet am","Date rated","date"],
+    ["averagerating","Ø-Bewertung aller Benutzer","Average rating (all users)","num"],
+  ]],
+  [["Titel & Interpret","Title & artist"], [
+    ["title","Titel","Title","text"],
+    ["album","Album","Album","text",1],
+    ["artist","Interpret","Artist","text",1],
+    ["albumartist","Album-Interpret","Album artist","text",1],
+    ["composer","Komponist","Composer","text",1],
+    ["genre","Genre","Genre","text",1],
+    ["mood","Stimmung (Mood-Tag)","Mood","text",1],
+    ["comment","Kommentar","Comment","text",1],
+    ["albumcomment","Albumkommentar","Album comment","text",1],
+    ["lyrics","Liedtext","Lyrics","text",1],
+    ["discsubtitle","Disc-Untertitel","Disc subtitle","text",1],
+    ["catalognumber","Katalognummer","Catalog number","text",1],
+    ["explicitstatus","Explicit-Status","Explicit status","text",1],
+    ["tracknumber","Tracknummer","Track number","num"],
+    ["discnumber","Disc-Nummer","Disc number","num"],
+    ["compilation","Ist Compilation","Is compilation","bool"],
+    ["hascoverart","Hat Cover","Has cover art","bool"],
+  ]],
+  [["Jahr & Datum","Year & date"], [
+    ["year","Jahr","Year","num"],
+    ["originalyear","Originaljahr","Original year","num"],
+    ["releaseyear","Veröffentlichungsjahr","Release year","num"],
+    ["date","Aufnahmedatum","Recording date","date"],
+    ["originaldate","Originaldatum","Original date","date"],
+    ["releasedate","Veröffentlichungsdatum","Release date","date"],
+    ["dateadded","Zur Bibliothek hinzugefügt","Date added","date"],
+    ["datemodified","Datei geändert","Date modified","date"],
+  ]],
+  [["Bibliothek & Datei","Library & file"], [
+    ["library_id","Bibliothek","Library","lib"],
+    ["filepath","Dateipfad (relativ)","File path (relative)","text"],
+    ["filetype","Dateityp","File type","text"],
+    ["codec","Codec","Codec","text"],
+    ["missing","Datei fehlt","File is missing","bool"],
+    ["size","Dateigröße (Bytes)","File size (bytes)","num"],
+    ["duration","Dauer (Sekunden)","Duration (seconds)","num"],
+    ["bitrate","Bitrate (kbit/s)","Bitrate (kbps)","num"],
+    ["bitdepth","Bittiefe","Bit depth","num",1],
+    ["samplerate","Abtastrate (Hz)","Sample rate (Hz)","num"],
+    ["channels","Kanäle","Channels","num"],
+    ["bpm","BPM","BPM","num",1],
+    ["rgtrackgain","ReplayGain Track (dB)","ReplayGain track (dB)","num",1],
+    ["rgtrackpeak","ReplayGain Track-Peak","ReplayGain track peak","num",1],
+    ["rgalbumgain","ReplayGain Album (dB)","ReplayGain album (dB)","num",1],
+    ["rgalbumpeak","ReplayGain Album-Peak","ReplayGain album peak","num",1],
+  ]],
+  [["Album","Album"], [
+    ["albumplaycount","Album: Wiedergaben","Album: play count","num"],
+    ["albumlastplayed","Album: zuletzt gespielt","Album: last played","date"],
+    ["albumloved","Album: mit Herz","Album: loved","bool"],
+    ["albumdateloved","Album: Herz vergeben am","Album: date loved","date"],
+    ["albumrating","Album: Bewertung (0–5)","Album: rating (0–5)","num"],
+    ["albumdaterated","Album: bewertet am","Album: date rated","date"],
+    ["albumdateadded","Album: hinzugefügt am","Album: date added","date"],
+    ["albumdatemodified","Album: geändert am","Album: date modified","date"],
+    ["albumduration","Album: Dauer (Sekunden)","Album: duration (seconds)","num"],
+    ["albumsongcount","Album: Anzahl Songs","Album: song count","num"],
+    ["albumsize","Album: Größe (Bytes)","Album: size (bytes)","num"],
+  ]],
+  [["Interpret (gesamt)","Artist (overall)"], [
+    ["artistplaycount","Interpret: Wiedergaben","Artist: play count","num"],
+    ["artistlastplayed","Interpret: zuletzt gespielt","Artist: last played","date"],
+    ["artistloved","Interpret: mit Herz","Artist: loved","bool"],
+    ["artistdateloved","Interpret: Herz vergeben am","Artist: date loved","date"],
+    ["artistrating","Interpret: Bewertung","Artist: rating","num"],
+    ["artistdaterated","Interpret: bewertet am","Artist: date rated","date"],
+  ]],
+  [["Sortiernamen","Sort names"], [
+    ["sorttitle","Sortiertitel","Sort title","text",1],
+    ["sortalbum","Sortieralbum","Sort album","text",1],
+    ["sortartist","Sortierinterpret","Sort artist","text",1],
+    ["sortalbumartist","Sortier-Album-Interpret","Sort album artist","text",1],
+  ]],
+  [["MusicBrainz","MusicBrainz"], [
+    ["mbz_album_id","MBID Album","MBID album","text",1],
+    ["mbz_album_artist_id","MBID Album-Interpret","MBID album artist","text",1],
+    ["mbz_artist_id","MBID Interpret","MBID artist","text",1],
+    ["mbz_recording_id","MBID Aufnahme","MBID recording","text",1],
+    ["mbz_release_track_id","MBID Release-Track","MBID release track","text",1],
+    ["mbz_release_group_id","MBID Release-Group","MBID release group","text",1],
+  ]],
+  [["Sonstiges","Other"], [
+    ["__playlist","Andere Playlist","Another playlist","playlist"],
+    ["__custom","Eigenes Tag …","Custom tag …","custom",1],
+  ]],
+];
+const FIELDS = {};
+FIELD_GROUPS.forEach(([, list]) => list.forEach(([key,de,en,type,m]) => FIELDS[key] = {key,de,en,type,missing:!!m}));
+const flabel = k => FIELDS[k] ? L(FIELDS[k].de, FIELDS[k].en) : k;
+
+const OPS = {
+  text:  [["contains","enthält","contains"],["notContains","enthält nicht","does not contain"],["is","ist genau","is"],["isNot","ist nicht","is not"],["startsWith","beginnt mit","starts with"],["endsWith","endet mit","ends with"]],
+  num:   [["gt","größer als","greater than"],["lt","kleiner als","less than"],["is","gleich","equals"],["isNot","ungleich","does not equal"],["inTheRange","zwischen (inklusive)","between (inclusive)"]],
+  date:  [["inTheLast","in den letzten","in the last"],["notInTheLast","nicht in den letzten","not in the last"],["after","nach dem","after"],["before","vor dem","before"],["inTheRange","zwischen","between"]],
+  bool:  [["is","ist","is"]],
+  lib:   [["is","ist","is"],["isNot","ist nicht","is not"]],
+  playlist: [["inPlaylist","enthält Songs aus","includes songs from"],["notInPlaylist","ohne Songs aus","excludes songs from"]],
+};
+OPS.custom = OPS.text;
+const MISSING_OPS = [["isPresent","ist vorhanden","is present"],["isMissing","fehlt / ist leer","is missing / empty"]];
+const opsRaw = k => FIELDS[k].missing ? OPS[FIELDS[k].type].concat(MISSING_OPS) : OPS[FIELDS[k].type];
+const opsFor = k => opsRaw(k).map(([v,de,en]) => [v, L(de,en)]);
+
+/* ============================================================
+   State
+============================================================ */
+let state;
+const newRule = () => ({type:"rule", field:"playcount", op:"gt", v1:"0", v2:"", custom:"", mode:"id", libOther:false});
+const newGroup = (conj="all") => ({type:"group", conj, items:[]});
+const blankState = () => ({name:"", comment:"", root:newGroup("all"), sort:[], limitMode:"none", limit:"", refresh:"", public:false, extra:{}});
+function defaultsFor(r){
+  const ty = FIELDS[r.field].type;
+  r.op = opsRaw(r.field)[0][0];
+  r.v1 = ty === "bool" ? "true" : ty === "lib" ? (libraries[0] ? String(libraries[0].id) : "") : ty === "date" ? "30" : "";
+  r.v2 = ""; r.libOther = ty === "lib" && !libraries.length;
+}
+
+/* ============================================================
+   Templates (generic)
+============================================================ */
+const TEMPLATES = [
+  [["Top 100","Top 100"], () => ({name:L("Top 100","Top 100"),comment:L("Die 100 meistgespielten Songs","Your 100 most played songs"),all:[{gt:{playcount:0}}],sort:"-playcount",limit:100})],
+  [["Daily Mix (einmal am Tag neu)","Daily mix (new once a day)"], () => ({name:"Daily Mix",comment:L("20 zufällige Songs aus den letzten 30 Tagen","20 random songs from the last 30 days"),all:[{inTheLast:{lastplayed:30}}],sort:"random",limit:20,refreshDelay:"1d"})],
+  [["Zuletzt gehört","Recently played"], () => ({name:L("Zuletzt gehört","Recently played"),comment:L("Was in den letzten 30 Tagen lief","What you played in the last 30 days"),all:[{inTheLast:{lastplayed:30}}],sort:"-lastplayed",limit:100})],
+  [["Lieblingssongs","Loved songs"], () => ({name:L("Lieblingssongs","Loved songs"),comment:L("Alle Songs mit Herz, die neuesten zuerst","All loved songs, newest first"),all:[{is:{loved:true}}],sort:"-dateloved",limit:500})],
+  [["Neu hinzugefügte Alben","Recently added albums"], () => ({name:L("Neu hinzugefügt","Recently added"),comment:L("Alben der letzten 30 Tage, in Albumreihenfolge","Albums from the last 30 days, in album order"),all:[{inTheLast:{albumdateadded:30}}],sort:"-albumdateadded,album,discnumber,tracknumber"})],
+  [["Wiederentdecken (Herz, lange nicht gehört)","Rediscover (loved, not played lately)"], () => ({name:L("Wiederentdecken","Rediscover"),comment:L("Lieblingssongs, die seit einem halben Jahr nicht liefen","Loved songs you haven't played in six months"),all:[{is:{loved:true}},{notInTheLast:{lastplayed:180}}],sort:"random",limit:50,refreshDelay:"1w"})],
+  [["Noch nie gespielt","Never played"], () => ({name:L("Noch nie gespielt","Never played"),comment:L("50 zufällige Songs ohne eine einzige Wiedergabe","50 random songs you have never played"),all:[{is:{playcount:0}}],sort:"random",limit:50,refreshDelay:"1d"})],
+  [["80er-Lieblinge (verschachtelt)","80s favourites (nested)"], () => ({name:L("80er-Lieblinge","80s favourites"),comment:L("Mit Herz oder gut bewertet, aus den 80ern","Loved or rated highly, from the 80s"),all:[{any:[{is:{loved:true}},{gt:{rating:3}}]},{inTheRange:{year:[1980,1989]}}],sort:"year,title",limit:100})],
+];
+
+/* ============================================================
+   DOM helpers
+============================================================ */
+function el(tag, attrs={}, ...kids){
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)){
+    if (k === "on") for (const [ev,fn] of Object.entries(v)) e.addEventListener(ev, fn);
+    else if (k === "class") e.className = v;
+    else if (k === "style") e.setAttribute("style", v);
+    else if (v === true) e.setAttribute(k, "");
+    else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null) e.append(k.nodeType ? k : document.createTextNode(k));
+  return e;
+}
+const options = (list, cur) => list.map(([v,l]) => el("option", {value:v, selected: String(v) === String(cur)}, l));
+const $ = id => document.getElementById(id);
+
+/* ============================================================
+   Rules
+============================================================ */
+function render(){ $("rules").replaceChildren(groupView(state.root, null)); update(); }
+
+function groupView(g, parent){
+  const isAll = g.conj === "all";
+  const head = el("div", {class:"ghead"},
+    el("div", {class:"seg", role:"group"},
+      el("button", {"aria-pressed": String(isAll), on:{click:()=>{g.conj="all"; render();}}}, t("all")),
+      el("button", {"aria-pressed": String(!isAll), on:{click:()=>{g.conj="any"; render();}}}, t("any"))),
+    el("span", {class:"glabel"}, isAll ? t("allLbl") : t("anyLbl")),
+    parent ? el("button", {class:"xbtn", title:t("removeGroup"), "aria-label":t("removeGroup"),
+      on:{click:()=>{parent.items.splice(parent.items.indexOf(g),1); render();}}}, "×") : null);
+  const body = [];
+  if (!g.items.length) body.push(el("div", {class:"empty"}, parent ? t("emptyGroup") : t("emptyRoot")));
+  g.items.forEach((it, i) => {
+    if (i > 0) body.push(el("div", {class:"join"}, isAll ? t("and") : t("or")));
+    body.push(it.type === "group" ? groupView(it, g) : it.type === "raw" ? rawView(it, g) : ruleView(it, g));
+  });
+  const foot = el("div", {class:"gfoot"},
+    el("button", {class:"add", on:{click:()=>{g.items.push(newRule()); render();}}}, t("addRule")),
+    el("button", {class:"add", on:{click:()=>{const ng = newGroup(isAll ? "any" : "all"); ng.items.push(newRule()); g.items.push(ng); render();}}}, t("addGroup")));
+  return el("div", {class:"group", "data-conj": g.conj}, head, body, foot);
+}
+
+function fieldSelect(r){
+  const sel = el("select", {class:"f", "aria-label":t("field"), on:{change:e=>{r.field = e.target.value; defaultsFor(r); render();}}});
+  FIELD_GROUPS.forEach(([gl, list]) => sel.append(el("optgroup", {label:L(...gl)}, options(list.map(f=>[f[0], L(f[1],f[2])]), r.field))));
+  return sel;
+}
+
+function ruleView(r, parent){
+  const f = FIELDS[r.field];
+  const set = k => e => { r[k] = e.target.value; update(); };
+  const parts = [fieldSelect(r)];
+  if (f.type === "custom")
+    parts.push(el("input", {class:"v short", placeholder:t("tagName"), value:r.custom, "aria-label":t("tagName"), on:{input:set("custom")}}));
+  parts.push(el("select", {class:"o", "aria-label":t("condition"), on:{change:e=>{
+    const prev = r.op; r.op = e.target.value;
+    const rangeLike = ["inTheRange","inTheLast","notInTheLast","before","after"];
+    if (rangeLike.includes(prev) || rangeLike.includes(r.op)) { r.v1 = f.type === "date" && r.op.includes("InTheLast") || r.op === "inTheLast" ? "30" : ""; r.v2 = ""; }
+    render();}}}, options(opsFor(r.field), r.op)));
+
+  const missingOp = r.op === "isMissing" || r.op === "isPresent";
+  let note = null;
+  if (!missingOp){
+    if (f.type === "bool"){
+      parts.push(el("select", {class:"v short", "aria-label":t("value"), on:{change:set("v1")}}, options([["true",t("yes")],["false",t("no")]], r.v1)));
+    } else if (f.type === "lib"){
+      const known = libraries.some(l => String(l.id) === String(r.v1));
+      if (!known && r.v1 !== "") r.libOther = true;
+      if (libraries.length){
+        const opts = libraries.map(l => [String(l.id), `${l.name} (ID ${l.id})`]).concat([["__other", t("otherId")]]);
+        parts.push(el("select", {class:"v", "aria-label":t("libraries"), on:{change:e=>{
+          if (e.target.value === "__other"){ r.libOther = true; r.v1 = ""; } else { r.libOther = false; r.v1 = e.target.value; }
+          render();}}}, options(opts, r.libOther ? "__other" : r.v1)));
+      }
+      if (r.libOther || !libraries.length){
+        parts.push(el("input", {class:"v short", type:"number", min:"0", placeholder:t("libIdPh"), value:r.v1, "aria-label":t("libIdPh"), on:{input:set("v1")}}));
+        if (!libraries.length) note = el("div", {class:"note"}, t("libNote") + " ",
+          el("button", {on:{click:openLibs}}, t("libNoteBtn")), t("libNoteEnd").startsWith(".") ? t("libNoteEnd") : " " + t("libNoteEnd"));
+      }
+    } else if (f.type === "playlist"){
+      parts.push(el("select", {class:"v short", on:{change:e=>{r.mode=e.target.value; update();}}}, options([["id",t("byId")],["path",t("byPath")]], r.mode)));
+      parts.push(el("input", {class:"v", value:r.v1, placeholder:t("plPh"), on:{input:set("v1")}}));
+    } else if (f.type === "date"){
+      if (r.op === "inTheLast" || r.op === "notInTheLast"){
+        parts.push(el("input", {class:"v short", type:"number", min:"1", value:r.v1, "aria-label":t("days"), on:{input:set("v1")}}), el("span", {class:"unit"}, t("days")));
+      } else if (r.op === "inTheRange"){
+        parts.push(el("input", {class:"v", type:"date", value:r.v1, "aria-label":t("from"), on:{input:set("v1")}}), el("span", {class:"unit"}, t("to")),
+                   el("input", {class:"v", type:"date", value:r.v2, "aria-label":t("to"), on:{input:set("v2")}}));
+      } else {
+        parts.push(el("input", {class:"v", type:"date", value:r.v1, "aria-label":t("value"), on:{input:set("v1")}}));
+      }
+    } else if (f.type === "num"){
+      const lim = r.field.endsWith("rating") ? {min:"0", max:"5"} : {};
+      if (r.op === "inTheRange"){
+        parts.push(el("input", {class:"v short", type:"number", step:"any", ...lim, value:r.v1, "aria-label":t("from"), on:{input:set("v1")}}), el("span", {class:"unit"}, t("to")),
+                   el("input", {class:"v short", type:"number", step:"any", ...lim, value:r.v2, "aria-label":t("to"), on:{input:set("v2")}}));
+      } else {
+        parts.push(el("input", {class:"v short", type:"number", step:"any", ...lim, value:r.v1, "aria-label":t("value"), on:{input:set("v1")}}));
+      }
+    } else {
+      parts.push(el("input", {class:"v", value:r.v1, placeholder:t("text"), "aria-label":t("value"), on:{input:set("v1")}}));
+    }
+  }
+  parts.push(el("button", {class:"xbtn", title:t("removeRule"), "aria-label":t("removeRule"),
+    on:{click:()=>{parent.items.splice(parent.items.indexOf(r),1); render();}}}, "×"));
+  if (note) parts.push(note);
+  return r._el = el("div", {class:"rule"}, parts);
+}
+
+function rawView(r, parent){
+  const ta = el("textarea", {"aria-label":"JSON", on:{input:e=>{r.text = e.target.value; update();}}});
+  ta.value = r.text;
+  return r._el = el("div", {class:"rule"},
+    el("div", {class:"rawnote"}, t("unknownRule")), ta,
+    el("button", {class:"xbtn", "aria-label":t("removeRule"), on:{click:()=>{parent.items.splice(parent.items.indexOf(r),1); render();}}}, "×"));
+}
+
+/* ============================================================
+   Sorting
+============================================================ */
+const sortable = () => [["random", t("random")]].concat(
+  FIELD_GROUPS.flatMap(([,list]) => list.filter(f=>!f[0].startsWith("__")).map(f=>[f[0], L(f[1],f[2])])));
+
+function renderSort(){
+  const box = $("sortRows"), all = sortable();
+  box.replaceChildren(...state.sort.map((s, i) => {
+    const opts = all.some(o=>o[0]===s.field) ? all : all.concat([[s.field, s.field]]);
+    return el("div", {class:"row"},
+      el("select", {"aria-label":t("sorting"), on:{change:e=>{s.field=e.target.value; renderSort(); update();}}}, options(opts, s.field)),
+      s.field === "random" ? null : el("button", {class:"dir", on:{click:()=>{s.desc=!s.desc; renderSort(); update();}}}, s.desc ? t("desc") : t("asc")),
+      el("button", {class:"xbtn", style:"margin-left:0", "aria-label":t("removeRule"), on:{click:()=>{state.sort.splice(i,1); renderSort(); update();}}}, "×"));
+  }));
+  if (!state.sort.length) box.append(el("div", {class:"empty"}, t("noSort")));
+}
+
+/* ============================================================
+   Static options
+============================================================ */
+const REFRESH = ["", "1h", "12h", "1d", "1w"];
+function syncOptions(){
+  $("name").value = state.name;
+  $("comment").value = state.comment;
+  document.querySelectorAll("input[name=lm]").forEach(r => r.checked = r.value === state.limitMode);
+  $("limitVal").value = state.limit;
+  $("limitRow").hidden = state.limitMode === "none";
+  $("limitUnit").textContent = state.limitMode === "percent" ? t("unitPct") : t("unitSongs");
+  const keys = ["refDefault","ref1h","ref12h","ref1d","ref1w"];
+  $("refreshSel").replaceChildren(...options(REFRESH.map((v,i)=>[v, t(keys[i])]).concat([["custom", t("refCustom")]]), ""));
+  if (REFRESH.includes(state.refresh)) { $("refreshSel").value = state.refresh; $("refreshCustomRow").hidden = true; }
+  else { $("refreshSel").value = "custom"; $("refreshCustom").value = state.refresh; $("refreshCustomRow").hidden = false; }
+  $("public").checked = state.public;
+}
+
+/* ============================================================
+   Export: state -> JSON
+============================================================ */
+let warnings;
+function warn(r, msg){ warnings.push(msg); r && r._el && r._el.classList.add("invalid"); }
+const num = v => { const s = String(v).trim().replace(",", "."); const n = Number(s); return s === "" || isNaN(n) ? null : n; };
+
+function ruleToJSON(r){
+  if (r.type === "group") {
+    const items = r.items.map(ruleToJSON).filter(Boolean);
+    if (!items.length) { warn(null, t("wEmptyGroup")); return null; }
+    return {[r.conj]: items};
+  }
+  if (r.type === "raw") {
+    try { return JSON.parse(stripJSON(r.text)); } catch { warn(r, t("wRaw")); return null; }
+  }
+  const f = FIELDS[r.field], name = f.type === "custom" ? (r.custom || t("customTag")) : flabel(r.field);
+  let field = r.field, val;
+  if (f.type === "custom") {
+    field = r.custom.trim().toLowerCase();
+    if (!field) { warn(r, t("wTag")); field = "tag"; }
+  }
+  if (r.op === "isMissing" || r.op === "isPresent") return {[r.op]: {[field]: true}};
+  if (f.type === "playlist") {
+    if (!r.v1.trim()) warn(r, t("wPl"));
+    return {[r.op]: {[r.mode]: r.v1.trim()}};
+  }
+  if (f.type === "bool") val = r.v1 === "true";
+  else if (f.type === "lib") { val = num(r.v1); if (val === null) warn(r, t("wLib")); }
+  else if (f.type === "num") {
+    if (r.op === "inTheRange") {
+      val = [num(r.v1), num(r.v2)];
+      if (val.includes(null)) warn(r, t("wRange", {x:name}));
+      else if (val[0] > val[1]) warn(r, t("wRangeOrder", {x:name}));
+    } else { val = num(r.v1); if (val === null) warn(r, t("wNum", {x:name})); }
+  } else if (f.type === "date") {
+    if (r.op === "inTheLast" || r.op === "notInTheLast") {
+      val = num(r.v1); if (val === null || val < 1) warn(r, t("wDays", {x:name}));
+    } else if (r.op === "inTheRange") {
+      val = [r.v1, r.v2];
+      if (!r.v1 || !r.v2) warn(r, t("wDates", {x:name}));
+      else if (r.v1 > r.v2) warn(r, t("wDateOrder", {x:name}));
+    } else { val = r.v1; if (!val) warn(r, t("wDate", {x:name})); }
+  } else {
+    val = r.v1; if (!val.trim()) warn(r, t("wText", {x:name}));
+  }
+  return {[r.op]: {[field]: val}};
+}
+
+function toJSON(){
+  warnings = [];
+  document.querySelectorAll(".rule.invalid").forEach(e => e.classList.remove("invalid"));
+  const o = {};
+  if (state.name.trim()) o.name = state.name.trim(); else warnings.push(t("wName"));
+  if (state.comment.trim()) o.comment = state.comment.trim();
+  if (state.public) o.public = true;
+  const items = state.root.items.map(ruleToJSON).filter(Boolean);
+  o[state.root.conj] = items;
+  if (!items.length) warnings.push(t("wNoRules"));
+  if (state.sort.length) o.sort = state.sort.map(s => s.field === "random" ? "random" : (s.desc ? "-" : "") + s.field).join(",");
+  const lim = Number(state.limit);
+  if (state.limitMode === "count") { if (!lim || lim < 1) warnings.push(t("wLimit")); else o.limit = Math.round(lim); }
+  else if (state.limitMode === "percent") { if (!lim || lim < 1 || lim > 100) warnings.push(t("wPct")); else o.limitPercent = Math.round(lim); }
+  if (state.refresh.trim()) {
+    if (!/^(\d+(w|d|h|m|s))+$/.test(state.refresh.trim())) warnings.push(t("wRefresh"));
+    o.refreshDelay = state.refresh.trim();
+  }
+  for (const [k,v] of Object.entries(state.extra)) if (!(k in o)) o[k] = v;
+  return o;
+}
+
+/* Formatting like the Navidrome docs: one rule per line */
+function compact(v){
+  if (Array.isArray(v)) return "[" + v.map(compact).join(", ") + "]";
+  if (v && typeof v === "object") return "{ " + Object.entries(v).map(([k,x]) => JSON.stringify(k) + ": " + compact(x)).join(", ") + " }";
+  return JSON.stringify(v);
+}
+const isGroup = v => v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 1 && ("all" in v || "any" in v);
+function pretty(v, ind=""){
+  const nx = ind + "  ";
+  if (Array.isArray(v)) {
+    if (!v.length) return "[]";
+    return "[\n" + v.map(x => nx + (isGroup(x) ? pretty(x, nx) : compact(x))).join(",\n") + "\n" + ind + "]";
+  }
+  if (v && typeof v === "object")
+    return "{\n" + Object.entries(v).map(([k,x]) => nx + JSON.stringify(k) + ": " + (Array.isArray(x) ? pretty(x, nx) : compact(x))).join(",\n") + "\n" + ind + "}";
+  return JSON.stringify(v);
+}
+const highlight = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;")
+  .replace(/("(?:[^"\\]|\\.)*")(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?)/g, (m, str, colon, b, n) =>
+    str ? (colon ? `<span class="jk">${str}</span>${colon}` : `<span class="js">${str}</span>`)
+        : b ? `<span class="jb">${b}</span>` : `<span class="jn">${n}</span>`);
+
+let lastText = "";
+function update(){
+  lastText = pretty(toJSON()) + "\n";
+  $("out").innerHTML = highlight(lastText);
+  $("fname").textContent = fileName();
+  const w = [...new Set(warnings)];
+  $("warns").replaceChildren(...w.map(x => el("li", {}, x)));
+  $("okMsg").hidden = w.length > 0;
+}
+const fileName = () => (state.name.trim().replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, "_") || "smart-playlist") + ".nsp";
+
+/* ============================================================
+   Import: JSON -> state
+============================================================ */
+function stripJSON(text){
+  let out = "", inStr = false, i = 0;
+  while (i < text.length){
+    const c = text[i], n = text[i+1];
+    if (inStr){ out += c; if (c === "\\"){ out += n ?? ""; i += 2; continue; } if (c === '"') inStr = false; i++; continue; }
+    if (c === '"'){ inStr = true; out += c; i++; continue; }
+    if (c === "/" && n === "/"){ while (i < text.length && text[i] !== "\n") i++; continue; }
+    if (c === "/" && n === "*"){ i += 2; while (i < text.length && !(text[i] === "*" && text[i+1] === "/")) i++; i += 2; continue; }
+    out += c; i++;
+  }
+  return out.replace(/,(\s*[}\]])/g, "$1");
+}
+
+function ruleFromJSON(o){
+  const raw = () => ({type:"raw", text: compact(o)});
+  if (!o || typeof o !== "object" || Array.isArray(o)) return raw();
+  const keys = Object.keys(o);
+  if (keys.length !== 1) return raw();
+  const op = keys[0];
+  if ((op === "all" || op === "any") && Array.isArray(o[op])) return {type:"group", conj:op, items:o[op].map(ruleFromJSON)};
+  const inner = o[op];
+  if (!inner || typeof inner !== "object" || Array.isArray(inner)) return raw();
+  if (op === "inPlaylist" || op === "notInPlaylist") {
+    const mode = "id" in inner ? "id" : "path" in inner ? "path" : null;
+    return mode ? {...newRule(), field:"__playlist", op, mode, v1:String(inner[mode])} : raw();
+  }
+  const ik = Object.keys(inner);
+  if (ik.length !== 1) return raw();
+  const rawField = ik[0], val = inner[rawField], lf = rawField.toLowerCase();
+  const known = FIELDS[lf] && !lf.startsWith("__");
+  const r = {...newRule(), field: known ? lf : "__custom", custom: known ? "" : rawField};
+  if (op === "isMissing" || op === "isPresent") {
+    if (!FIELDS[r.field].missing) return raw();
+    r.op = val === false ? (op === "isMissing" ? "isPresent" : "isMissing") : op;
+    r.v1 = ""; return r;
+  }
+  if (!opsRaw(r.field).some(x => x[0] === op)) return raw();
+  r.op = op;
+  if (Array.isArray(val)) { if (val.length !== 2) return raw(); r.v1 = String(val[0]); r.v2 = String(val[1]); }
+  else if (val !== null && typeof val === "object") return raw();
+  else r.v1 = String(val);
+  return r;
+}
+
+function fromJSON(o){
+  const s = blankState();
+  const known = ["name","comment","public","all","any","sort","order","limit","limitPercent","refreshDelay"];
+  s.name = o.name || ""; s.comment = o.comment || ""; s.public = o.public === true;
+  const conj = Array.isArray(o.any) && !Array.isArray(o.all) ? "any" : "all";
+  s.root = {type:"group", conj, items:(o[conj] || []).map(ruleFromJSON)};
+  if (Array.isArray(o.all) && Array.isArray(o.any)) {
+    s.root.items.push({type:"group", conj:"any", items:o.any.map(ruleFromJSON)});
+    toast(t("bothTop"), 6000);
+  }
+  if (typeof o.sort === "string") {
+    const flip = String(o.order || "").toLowerCase() === "desc";
+    s.sort = o.sort.split(",").map(x => x.trim()).filter(Boolean).map(x => {
+      let desc = x.startsWith("-"); if (flip) desc = !desc;
+      return {field: x.replace(/^[+-]/, "").toLowerCase(), desc};
+    });
+  }
+  if (o.limitPercent) { s.limitMode = "percent"; s.limit = String(o.limitPercent); }
+  else if (o.limit) { s.limitMode = "count"; s.limit = String(o.limit); }
+  if (o.refreshDelay) s.refresh = String(o.refreshDelay);
+  for (const [k,v] of Object.entries(o)) if (!known.includes(k)) s.extra[k] = v;
+  return s;
+}
+
+function loadState(s){ state = s; syncOptions(); renderSort(); render(); }
+function loadText(text, label){
+  try {
+    const o = JSON.parse(stripJSON(text));
+    if (!o || typeof o !== "object" || Array.isArray(o)) throw new Error(t("noObject"));
+    loadState(fromJSON(o)); toast(t("loaded", {x:label}));
+  } catch(e) { toast(t("loadErr", {x:label, e:e.message}), 6000); }
+}
+const hasContent = () => state.name.trim() || state.root.items.length > 1;
+
+/* ============================================================
+   Libraries dialog
+============================================================ */
+function renderLibs(){
+  const box = $("libRows");
+  box.replaceChildren(...libraries.map((l, i) => el("div", {class:"librow"},
+    el("input", {class:"ln", value:l.name, placeholder:t("libName"), "aria-label":t("libName"), on:{input:e=>{l.name=e.target.value; store.set("libraries", libraries);}}}),
+    el("input", {class:"li", type:"number", min:"0", value:l.id, placeholder:t("libId"), "aria-label":t("libId"), on:{input:e=>{l.id=e.target.value; store.set("libraries", libraries);}}}),
+    el("button", {class:"xbtn", style:"margin-left:0", "aria-label":t("removeRule"), on:{click:()=>{libraries.splice(i,1); store.set("libraries", libraries); renderLibs();}}}, "×"))));
+  if (!libraries.length) box.append(el("div", {class:"empty"}, t("libNone")));
+}
+function openLibs(){ renderLibs(); $("libDlg").showModal(); }
+$("libBtn").addEventListener("click", openLibs);
+$("libAdd").addEventListener("click", () => {
+  const next = libraries.reduce((m, l) => Math.max(m, Number(l.id) || 0), 0) + 1;
+  libraries.push({name:"", id:String(next)}); store.set("libraries", libraries); renderLibs();
+  $("libRows").querySelector(".librow:last-child .ln")?.focus();
+});
+$("libClose").addEventListener("click", () => $("libDlg").close());
+$("libDlg").addEventListener("close", () => {
+  libraries = libraries.filter(l => String(l.id).trim() !== "").map(l => ({name: l.name.trim() || "ID " + l.id, id: String(l.id).trim()}));
+  store.set("libraries", libraries); render();
+});
+
+/* ============================================================
+   Language
+============================================================ */
+function applyLang(l){
+  lang = l; store.set("lang", l); document.documentElement.lang = l;
+  document.querySelectorAll("[data-t]").forEach(e => e.textContent = t(e.dataset.t));
+  document.querySelectorAll("[data-tp]").forEach(e => { e.placeholder = t(e.dataset.tp); e.setAttribute("aria-label", t(e.dataset.tp)); });
+  document.querySelectorAll(".lang button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === l)));
+  $("tplSel").replaceChildren(el("option", {value:""}, t("tplPick")), ...TEMPLATES.map(([lbl], i) => el("option", {value:i}, L(...lbl))));
+  if (state) { syncOptions(); renderSort(); render(); }
+}
+document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => applyLang(b.dataset.lang)));
+
+/* ============================================================
+   Events
+============================================================ */
+$("name").addEventListener("input", e => { state.name = e.target.value; update(); });
+$("comment").addEventListener("input", e => { state.comment = e.target.value; update(); });
+document.querySelectorAll("input[name=lm]").forEach(r => r.addEventListener("change", e => {
+  state.limitMode = e.target.value;
+  if (state.limitMode !== "none" && !state.limit) state.limit = state.limitMode === "percent" ? "10" : "100";
+  syncOptions(); update();
+}));
+$("limitVal").addEventListener("input", e => { state.limit = e.target.value; update(); });
+$("refreshSel").addEventListener("change", e => {
+  const v = e.target.value;
+  $("refreshCustomRow").hidden = v !== "custom";
+  state.refresh = v === "custom" ? $("refreshCustom").value : v;
+  update();
+});
+$("refreshCustom").addEventListener("input", e => { state.refresh = e.target.value; update(); });
+$("public").addEventListener("change", e => { state.public = e.target.checked; update(); });
+$("addSort").addEventListener("click", () => { state.sort.push({field:"playcount", desc:true}); renderSort(); update(); });
+
+$("newBtn").addEventListener("click", () => {
+  if (hasContent() && !confirm(t("confirmNew"))) return;
+  const s = blankState(); s.root.items.push(newRule()); loadState(s);
+});
+$("tplSel").addEventListener("change", e => {
+  const i = e.target.value; e.target.value = "";
+  if (i === "") return;
+  if (hasContent() && !confirm(t("confirmTpl"))) return;
+  loadState(fromJSON(TEMPLATES[i][1]()));
+  toast(t("tplLoaded", {x:L(...TEMPLATES[i][0])}));
+});
+
+$("loadBtn").addEventListener("click", () => $("fileIn").click());
+$("fileIn").addEventListener("change", e => {
+  const f = e.target.files[0]; if (f) f.text().then(x => loadText(x, f.name)); e.target.value = "";
+});
+let dragDepth = 0;
+window.addEventListener("dragenter", e => { if ([...e.dataTransfer.types].includes("Files")) { dragDepth++; $("drop").classList.add("on"); } });
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; $("drop").classList.remove("on"); } });
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => {
+  e.preventDefault(); dragDepth = 0; $("drop").classList.remove("on");
+  const f = e.dataTransfer.files[0]; if (f) f.text().then(x => loadText(x, f.name));
+});
+
+$("dlBtn").addEventListener("click", () => {
+  const a = el("a", {href: URL.createObjectURL(new Blob([lastText], {type:"application/json"})), download: fileName()});
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast(t("downloaded", {x:fileName()}));
+});
+$("copyBtn").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(lastText); }
+  catch { const ta = el("textarea"); ta.value = lastText; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+  toast(t("copied"));
+});
+
+let toastTimer;
+function toast(msg, ms=2600){
+  const el_ = $("toast"); el_.textContent = msg; el_.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el_.classList.remove("show"), ms);
+}
+
+/* ============================================================
+   Start
+============================================================ */
+applyLang(store.get("lang", (navigator.language || "en").toLowerCase().startsWith("de") ? "de" : "en"));
+loadState(fromJSON(TEMPLATES[0][1]()));
+</script>
+</body>
+</html>
